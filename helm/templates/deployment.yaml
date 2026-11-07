@@ -4,7 +4,7 @@ metadata:
   name: myapp
 
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicaCount }}
 
   selector:
     matchLabels:
@@ -25,3 +25,17 @@ spec:
           env:
             - name: ENVIRONMENT
               value: "{{ .Values.environment }}"
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
