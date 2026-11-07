@@ -1,13 +1,65 @@
 stages:
+  - lint
+  - test
   - build
   - deploy
 
+lint:dockerfile:
+  stage: lint
+  image: hadolint/hadolint:v2.15.1-debian
+  script:
+    - hadolint app/Dockerfile
+
+lint:helm:
+  stage: lint
+  image:
+    name: alpine/helm:3.22
+    entrypoint: [""]
+  script:
+    - helm lint helm/
+    - helm template test helm/
+
+lint:terraform:
+  stage: lint
+  image:
+    name: hashicorp/terraform:1.17
+    entrypoint: [""]
+  script:
+    - terraform -chdir=terraform fmt -check
+    - terraform -chdir=terraform init
+    - terraform -chdir=terraform validate
+
+test:
+  stage: test
+  image: python:3.13-slim
+  script:
+    - pip install --no-cache-dir -r app/requirements.txt pytest
+    - pytest app/ -v
+     
 build:
   stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
   script:
-    - echo "Building the application..."
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - docker build -t $IMAGE app/
+    - docker push $IMAGE
 
 deploy:
   stage: deploy
+  image: 
+    name: alpine/helm:3.22
+    entrypoint: [""]
+  environment:
+    name: dev
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   script:
-    - echo "Deploying the application..."
+    - > 
+     helm upgrade --install homework helm/ 
+     --set image.repository=$CI_REGISTRY_IMAGE,image.tag=$CI_COMMIT_SHORT_SHA 
+     --namespace dev --create-namespace 
+     --wait
