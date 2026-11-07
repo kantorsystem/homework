@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: myapp
-  tag: latest
+  tag: dev
 
 service:
   port: 8080
